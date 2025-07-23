@@ -1,26 +1,56 @@
-from qdrant_client import QdrantClient
-from qdrant_client.models import PointStruct, VectorParams, Distance
+from qdrant_client import QdrantClient, models
 from app.core.config import settings
+from app.services.embedding import embed_query  # Make sure this exists!
 
 client = QdrantClient(url=settings.QDRANT_URL)
 
-COLLECTION_NAME = "documents"
+def ensure_collection_exists(vector_size: int):
+    if not client.collection_exists(collection_name=settings.QDRANT_COLLECTION):
+        client.create_collection(
+            collection_name=settings.QDRANT_COLLECTION,
+            vectors_config=models.VectorParams(
+                size=vector_size,
+                distance=models.Distance.COSINE
+            )
+        )
+        print(f"✅ Created collection `{settings.QDRANT_COLLECTION}` with vector size {vector_size}")
 
-client.recreate_collection(
-    collection_name=COLLECTION_NAME,
-    vectors_config=VectorParams(size=4096, distance=Distance.COSINE),
-)
+def upsert_embeddings(vectors):
+    """
+    Ensure the collection exists, then upsert embeddings.
+    """
+    if not vectors:
+        raise ValueError("No vectors to upsert!")
 
-def upsert_embeddings(embeddings: list):
-    points = []
-    for i, item in enumerate(embeddings):
-        points.append(PointStruct(id=i, vector=item["embedding"], payload={"text": item["text"]}))
-    client.upsert(collection_name=COLLECTION_NAME, points=points)
+    vector_size = len(vectors[0]["vector"])
+    ensure_collection_exists(vector_size)
 
-def semantic_search(embedding):
-    hits = client.search(
-        collection_name=COLLECTION_NAME,
-        query_vector=embedding,
-        limit=5
+    client.upsert(
+        collection_name=settings.QDRANT_COLLECTION,
+        points=[
+            models.PointStruct(
+                id=vec["id"],
+                vector=vec["vector"],
+                payload=vec["payload"]
+            )
+            for vec in vectors
+        ]
     )
-    return [{"text": hit.payload["text"], "score": hit.score} for hit in hits]
+    print(f"✅ Upserted {len(vectors)} vectors to `{settings.QDRANT_COLLECTION}`")
+
+def get_similar_chunks(query: str, limit=5):
+    """
+    Embed the query and search for similar vectors.
+    """
+    query_vector = embed_query(query)
+    search_result = client.search(
+        collection_name=settings.QDRANT_COLLECTION,
+        query_vector=query_vector,
+        limit=limit
+    )
+    chunks = []
+    for hit in search_result:
+        payload = hit.payload or {}
+        payload["score"] = hit.score
+        chunks.append(payload)
+    return chunks

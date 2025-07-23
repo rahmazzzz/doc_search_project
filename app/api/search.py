@@ -1,16 +1,17 @@
 from fastapi import APIRouter, Query
-from app.services.embedding import embed_query
-from app.services.mongo_client import text_search
-from app.services.qdrant_client import semantic_search
+from app.core.config import settings
+from app.services.qdrant_client import get_similar_chunks
+from app.services.llm import call_llm
 
 router = APIRouter()
 
 @router.get("/")
-async def search(query: str, mode: str = "hybrid"):
-    results = []
-    if mode in ["fulltext", "hybrid"]:
-        results.extend(text_search(query))
-    if mode in ["semantic", "hybrid"]:
-        embedding = embed_query(query)
-        results.extend(semantic_search(embedding))
-    return {"results": results}
+async def search(query: str = Query(..., description="Your question to search for")):
+    chunks = get_similar_chunks(query)
+    context = "\n\n".join([chunk["text"] for chunk in chunks])
+    answer = call_llm(query, context)
+    return {
+        "query": query,
+        "chunks_used": [chunk["text"] for chunk in chunks],
+        "answer": answer
+    }
