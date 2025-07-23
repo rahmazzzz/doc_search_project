@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pymongo
+cohere
+qdrant-client
+pydantic-settings
+PyMuPDF
+python-dotenv
+python-multipart

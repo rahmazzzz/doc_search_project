@@ -1,0 +1,77 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Python dotenv environment files
+.env
+
+# VS Code / IDE configs
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Docker build
+*.pid
+
+# Python test cache
+.pytest_cache/
+.coverage
+.tox/
+
+# mypy
+.mypy_cache/
+
+# Local data
+*.sqlite3
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Docker Compose override
+docker-compose.override.yml
+
+# Generated files
+*.pdf
+
+# Node stuff (if using JS frontend)
+node_modules/
+
+# Qdrant or Mongo local data
+*.db
+data/
+
+# Backup files
+*.bak
+*.swp
+*.swo
