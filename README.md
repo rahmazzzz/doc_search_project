@@ -1,121 +1,168 @@
-###DocSearch Project — Updated RAG Pipeline
+# 📄 DocSearch – Document Retrieval with RAG
 
-A simple Document Search microservice implementing Retrieval-Augmented Generation (RAG) using:
-
-FastAPI — modern web framework
-
-Qdrant — vector database for semantic search
-
-MongoDB — stores text chunks and user data
-
-Cohere — for embeddings and LLM-based answers
-
+A microservice for document search and question answering using **Retrieval-Augmented Generation (RAG)**. Built with FastAPI, this service enables uploading documents, indexing them, and retrieving context-based answers via semantic search.
 
 ---
 
-### Features
+## ⚙️ Stack Overview
 
-Upload documents (PDF, TXT, etc.)
-
-Automatically split documents into chunks
-
-Store chunks in MongoDB
-
-Generate and store embeddings in Qdrant
-
-Search using semantic similarity
-
-Get context-aware answers grounded in your documents
-
+* **FastAPI** – Web framework for building APIs.
+* **Qdrant** – Vector database for semantic search.
+* **MongoDB** – Stores document chunks and user metadata.
+* **Cohere** – Provides embeddings and LLM responses.
+* **JWT Authentication** – Secure access to protected routes.
 
 ---
 
-### API Routes
+## 🔐 Authentication (JWT)
 
-POST /upload/
+This project uses token-based authentication (OAuth2 with Bearer tokens).
 
-Uploads a document and indexes it:
+* Register a user via `/auth/register`
+* Log in via `/auth/login` to obtain a token
+* Use the token in the `Authorization: Bearer <token>` header for all protected routes (e.g., `/upload`, `/search`)
 
-Reads the document
+> The Swagger UI supports authenticated requests via the Authorize button.
 
-Extracts and chunks the content
+---
 
-Stores chunks in MongoDB
+## 🚀 API Endpoints
 
-Embeds chunks using Cohere
+### 📁 Upload Document
 
-Stores vectors in Qdrant
+**POST** `/upload/`
+Requires JWT token.
 
-Response:
+Processes and indexes an uploaded document:
 
+* Reads and decodes file contents
+* Extracts and chunks text
+* Stores text chunks in MongoDB
+* Generates embeddings via Cohere
+* Stores vectors in Qdrant
+
+**Response:**
+
+```json
 {
-  "message": "Uploaded & indexed"
+  "message": "Uploaded & indexed by",
+  "user": "username"
 }
+```
 
-### GET /search/
+---
 
-Performs a semantic search using a question:
+### 🔍 Search Documents
 
-Embeds the question with Cohere
+**GET** `/search/`
+Requires JWT token.
 
-Retrieves top matching chunks from Qdrant
+Performs semantic search based on user query:
 
-Sends context + question to Cohere's LLM
+* Embeds the question using Cohere
+* Retrieves top matching chunks from Qdrant
+* Constructs a prompt and sends it to the LLM
+* Returns an answer grounded in the document content
 
-Returns an answer
+**Query Parameter:**
 
-Query parameter:query=your_question
+```
+query=your_question
+```
 
-Response:
+**Response:**
+
+```json
 {
   "query": "your_question",
   "chunks_used": ["text chunk 1", "text chunk 2", "..."],
-  "answer": "LLM-generated response"
+  "answer": "LLM-generated response",
+  "user": "username"
 }
+```
 
-### Authentication Routes
+---
 
-POST /auth/register
+### 👤 Authentication
 
-Registers a new user.
+#### Register User
 
-Response:
-{ "message": "User created successfully" }
+**POST** `/auth/register`
 
-Request body:
-Authentication Routes
+**Request Body:**
 
-POST /auth/register
+```json
+{
+  "name": "John Doe",
+  "username": "johndoe",
+  "email": "johndoe@example.com",
+  "password": "your_secure_password"
+}
+```
 
-Registers a new user.
+**Response:**
 
-Request body:
+```json
+{
+  "message": "User created successfully"
+}
+```
 
+#### Login User
 
-POST /auth/login
+**POST** `/auth/login`
 
-Logs in and returns a JWT token.
+**Request Body:**
 
-Request body:
+```json
 {
   "username": "johndoe",
   "password": "your_secure_password"
 }
+```
 
-Response:
-{ "access_token": "jwt_token", "token_type": "bearer" }
+**Response:**
 
-Use this token in the Authorization: Bearer <token> header for protected routes like upload and search.
+```json
+{
+  "access_token": "jwt_token",
+  "token_type": "bearer"
+}
+```
 
-### Environment Variables
+---
 
-Create a .env file in the root of your project:
+## 🛠️ Environment Variables
 
+Create a `.env` file in the project root with the following keys:
+
+```env
 COHERE_API_KEY=your_cohere_api_key
 MONGO_URI=mongodb://localhost:27017
 MONGODB_DATABASE=mydb
 QDRANT_URL=http://localhost:6333
 QDRANT_COLLECTION=my_collection
-JWT_SECRET=your_jwt_secret
-JWT_ALGORITHM=HS256
+SECRET_KEY=your_jwt_secret
+```
 
+---
+
+## ✅ Setup & Run
+
+1. Install dependencies:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. Run the FastAPI app:
+
+   ```bash
+   uvicorn app.main:app --reload
+   ```
+
+3. Open Swagger UI at:
+
+   ```
+   http://localhost:8000/docs
+   ```
