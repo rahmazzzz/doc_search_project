@@ -1,32 +1,33 @@
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import EmailStr
+from fastapi.security import OAuth2PasswordRequestForm
 from app.auth.jwt import create_access_token
 from app.auth.hashing import hash_password, verify_password
 from app.models.user import User
-from app.core.config import settings
-from app.services.mongo_client import get_user_collection
-from fastapi.security import OAuth2PasswordRequestForm
+from app.clients.mongo_client import MongoClient
 
 router = APIRouter()
+mongo_client = MongoClient()  
 
-@router.post("/register")
-async def register(user: User):  #  Make it async
-    users_collection = get_user_collection()  # Correct use, not awaited
 
-    existing = await users_collection.find_one({"username": user.username})  #  await here
+@router.post("/register", summary="Register a new user")
+async def register(user: User):
+    users_collection = mongo_client.get_user_collection()
+
+    existing = await users_collection.find_one({"username": user.username})
     if existing:
         raise HTTPException(status_code=400, detail="Username already exists")
 
     user.password = hash_password(user.password)
-    await users_collection.insert_one(user.dict())  #  await here
+    await users_collection.insert_one(user.dict())
+
     return {"message": "Registration successful"}
 
 
-@router.post("/login")
+@router.post("/login", summary="Login and get a JWT token")
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    users_collection = get_user_collection()
-    user = await users_collection.find_one({"username": form_data.username})
+    users_collection = mongo_client.get_user_collection()
 
+    user = await users_collection.find_one({"username": form_data.username})
     if not user or not verify_password(form_data.password, user['password']):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 

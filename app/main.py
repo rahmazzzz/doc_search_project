@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.api import upload, search
+from app.routers import upload, search
 from app.auth import routes as auth_routes
 
 app = FastAPI(
