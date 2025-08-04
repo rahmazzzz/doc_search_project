@@ -1,9 +1,14 @@
 fastapi
 uvicorn
 pymongo
+motor
 cohere
 qdrant-client
 pydantic-settings
 PyMuPDF
 python-dotenv
 python-multipart
+passlib[bcrypt]
+python-jose[cryptography]
+pydantic[email]
+

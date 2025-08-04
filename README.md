@@ -1,51 +1,121 @@
-# 🧩 DocSearch Project — Updated RAG Pipeline
+###DocSearch Project — Updated RAG Pipeline
 
-A simple Document Search (RAG) microservice using:
-- 📚 **FastAPI** — API framework
-- 🧩 **Qdrant** — vector database for embeddings
-- 🗄️ **MongoDB** — store original text chunks
-- 🤖 **Cohere** — for embeddings + LLM answers
+A simple Document Search microservice implementing Retrieval-Augmented Generation (RAG) using:
 
----
+FastAPI — modern web framework
 
-## 📂 **Features**
+Qdrant — vector database for semantic search
 
-✅ Upload documents (PDF, TXT, etc.)  
-✅ Auto-chunk and store in MongoDB  
-✅ Generate embeddings using Cohere  
-✅ Store vectors in Qdrant  
-✅ Search with semantic similarity  
-✅ Get answers grounded in your docs
+MongoDB — stores text chunks and user data
+
+Cohere — for embeddings and LLM-based answers
+
 
 ---
 
-## 🚀 **Routes**
+### Features
 
-### `POST /upload/`
+Upload documents (PDF, TXT, etc.)
 
-Upload a file.  
-- Extracts text chunks.
-- Stores in MongoDB.
-- Embeds with Cohere.
-- Stores vectors in Qdrant.
+Automatically split documents into chunks
 
-### `GET /search/`
+Store chunks in MongoDB
 
-Ask a question.  
-- Embeds the question.
-- Finds similar chunks in Qdrant.
-- Sends context to Cohere LLM.
-- Returns an answer grounded in your docs.
+Generate and store embeddings in Qdrant
+
+Search using semantic similarity
+
+Get context-aware answers grounded in your documents
+
 
 ---
 
-## ⚙️ **Environment Variables**
+### API Routes
 
-Create a `.env` file:
+POST /upload/
 
-```env
+Uploads a document and indexes it:
+
+Reads the document
+
+Extracts and chunks the content
+
+Stores chunks in MongoDB
+
+Embeds chunks using Cohere
+
+Stores vectors in Qdrant
+
+Response:
+
+{
+  "message": "Uploaded & indexed"
+}
+
+### GET /search/
+
+Performs a semantic search using a question:
+
+Embeds the question with Cohere
+
+Retrieves top matching chunks from Qdrant
+
+Sends context + question to Cohere's LLM
+
+Returns an answer
+
+Query parameter:query=your_question
+
+Response:
+{
+  "query": "your_question",
+  "chunks_used": ["text chunk 1", "text chunk 2", "..."],
+  "answer": "LLM-generated response"
+}
+
+### Authentication Routes
+
+POST /auth/register
+
+Registers a new user.
+
+Response:
+{ "message": "User created successfully" }
+
+Request body:
+Authentication Routes
+
+POST /auth/register
+
+Registers a new user.
+
+Request body:
+
+
+POST /auth/login
+
+Logs in and returns a JWT token.
+
+Request body:
+{
+  "username": "johndoe",
+  "password": "your_secure_password"
+}
+
+Response:
+{ "access_token": "jwt_token", "token_type": "bearer" }
+
+Use this token in the Authorization: Bearer <token> header for protected routes like upload and search.
+
+### Environment Variables
+
+Create a .env file in the root of your project:
+
 COHERE_API_KEY=your_cohere_api_key
 MONGO_URI=mongodb://localhost:27017
 MONGODB_DATABASE=mydb
 QDRANT_URL=http://localhost:6333
 QDRANT_COLLECTION=my_collection
+JWT_SECRET=your_jwt_secret
+JWT_ALGORITHM=HS256
+
