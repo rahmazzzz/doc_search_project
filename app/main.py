@@ -1,16 +1,31 @@
 from fastapi import FastAPI
-from app.routers import upload, search
-from app.auth import routes as auth_routes
+from fastapi.middleware.cors import CORSMiddleware
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+
+from app.routes import auth_routes, file_routes, search_routes
 
 app = FastAPI(
-    title="DocSearch",
-    description="Upload documents and search answers from them using LLM and vector search",
-    version="1.0.0",
+    title="Document Search API",
+    version="1.0.0"
 )
 
-# Auth routes (register, login)
-app.include_router(auth_routes.router, tags=["Auth"])
+# CORS middleware (allow all origins — you can restrict it if needed)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-#  Document handling routes
-app.include_router(upload.router, prefix="/upload", tags=["Upload"])
-app.include_router(search.router, prefix="/search", tags=["Search"])
+# Register routes
+app.include_router(auth_routes.router, prefix="/auth", tags=["Authentication"])
+app.include_router(file_routes.router, prefix="/upload", tags=["Upload"])
+app.include_router(search_routes.router, prefix="/search", tags=["Search"])
+
+# Root endpoint
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to the Document Search API"}
