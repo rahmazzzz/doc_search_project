@@ -1,7 +1,13 @@
-from typing import List
+from typing import List, Optional
 from app.clients.qdrant_client import QdrantDBClient
-from qdrant_client.models import PointStruct, VectorParams, Distance
-import uuid
+from qdrant_client.models import (
+    PointStruct,
+    VectorParams,
+    Distance,
+    Filter,
+    FieldCondition,
+    MatchValue
+)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -46,15 +52,29 @@ class QdrantRepository:
             logger.error(f"Error deleting Qdrant collection: {e}")
             raise
 
-    def search_vectors(self, query_vector: List[float], top_k: int = 5):
+    def search_vectors(self, query_vector: List[float], top_k: int = 5, username: Optional[str] = None):
         try:
             logger.info(f"Searching top {top_k} vectors from Qdrant...")
+
+            q_filter = None
+            if username:
+                q_filter = Filter(
+                    must=[
+                        FieldCondition(
+                            key="username",
+                            match=MatchValue(value=username)
+                        )
+                    ]
+                )
+
             results = self.client.search(
                 collection_name=self.collection_name,
                 query_vector=query_vector,
-                limit=top_k
+                limit=top_k,
+                query_filter=q_filter
             )
             return results
+
         except Exception as e:
             logger.error(f"Error searching vectors in Qdrant: {e}")
             raise
