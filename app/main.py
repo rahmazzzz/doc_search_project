@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
+from app.routes import question_routes
+
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -24,6 +26,7 @@ app.add_middleware(
 app.include_router(auth_routes.router, prefix="/auth", tags=["Authentication"])
 app.include_router(file_routes.router, prefix="/upload", tags=["Upload"])
 app.include_router(search_routes.router, prefix="/search", tags=["Search"])
+app.include_router(question_routes.router, prefix="/questions", tags=["Questions"])
 
 # Root endpoint
 @app.get("/")

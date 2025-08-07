@@ -1,0 +1,26 @@
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from app.deps import get_current_user
+from app.container.core_container import container
+from app.models.user import User
+
+router = APIRouter()
+
+class QuestionRequest(BaseModel):
+    question: str
+
+@router.post("/ask")
+async def ask_question(request: QuestionRequest, current_user: User = Depends(get_current_user)):
+    """
+    Route to ask a question and get an answer based on user's uploaded documents.
+    """
+    result = container.processing_service.answer_question(
+        user_id = str(current_user["id"])
+,
+        question=request.question
+    )
+
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+
+    return result

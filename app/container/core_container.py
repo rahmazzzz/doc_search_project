@@ -1,12 +1,14 @@
 from app.clients.mongo_client import MongoDBClient
 from app.clients.qdrant_client import QdrantDBClient
 from app.clients.cohere_client import CohereEmbeddingClient
+
 from app.services.mongo_service import MongoService
 from app.services.qdrant_service import QdrantService
 from app.services.processing import ProcessingService
+
 from app.core.config import settings
 
-# Initialize clients
+# Initialize database clients
 mongo_client = MongoDBClient(
     uri=settings.MONGO_URI,
     db_name=settings.MONGODB_DATABASE
@@ -18,6 +20,7 @@ qdrant_client = QdrantDBClient(
     collection_name=settings.QDRANT_COLLECTION
 )
 
+# Initialize embedding client
 cohere_client = CohereEmbeddingClient(
     api_key=settings.COHERE_API_KEY
 )
@@ -25,7 +28,13 @@ cohere_client = CohereEmbeddingClient(
 # Initialize services
 mongo_service = MongoService(mongo_client)
 qdrant_service = QdrantService(qdrant_client)
-processing_service = ProcessingService(cohere_client)
+
+# Pass all needed services to ProcessingService
+processing_service = ProcessingService(
+    cohere_client=cohere_client,
+    mongo_service=mongo_service,
+    qdrant_service=qdrant_service
+)
 
 # Dependency container
 class Container:
@@ -33,6 +42,7 @@ class Container:
         self.mongo_service = mongo_service
         self.qdrant_service = qdrant_service
         self.processing_service = processing_service
+        self.cohere_client = cohere_client  # Optional: exposed in case needed directly
 
-# Exported container
+# Exported container instance
 container = Container()
