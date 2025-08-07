@@ -7,7 +7,8 @@ from app.repositories.qdrant_repository import QdrantRepository
 
 from app.services.mongo_service import MongoService
 from app.services.qdrant_service import QdrantService
-from app.services.processing import ProcessingService
+from app.services.embedding import EmbeddingService
+from app.services.llm import LLMService
 
 from app.core.config import settings
 
@@ -35,12 +36,12 @@ qdrant_repository = QdrantRepository(qdrant_client)
 # Initialize services
 mongo_service = MongoService(mongo_repository)
 qdrant_service = QdrantService(qdrant_repository)
-
-# Processing service uses both mongo and qdrant services + cohere client
-processing_service = ProcessingService(
+embedding_service = EmbeddingService(cohere_client=cohere_client)
+llm_service = LLMService(
+    qdrant_service=qdrant_service,
     cohere_client=cohere_client,
-    mongo_service=mongo_service,
-    qdrant_service=qdrant_service
+    embedding_service=embedding_service,
+    mongo_service=mongo_service
 )
 
 # Dependency container
@@ -55,7 +56,8 @@ class Container:
 
         self.mongo_service = mongo_service
         self.qdrant_service = qdrant_service
-        self.processing_service = processing_service
+        self.embedding_service = embedding_service
+        self.llm_service = llm_service
 
 # Exported container instance
 container = Container()

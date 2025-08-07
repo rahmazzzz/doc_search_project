@@ -15,3 +15,17 @@ class CohereEmbeddingClient:
             input_type=self.input_type
         )
         return response.embeddings
+
+    def chat(self, message: str, documents: List[dict]) -> str:
+        """
+        Chat with Cohere using the retrieved context documents.
+        Each document is a dict with a "text" key.
+        """
+        try:
+            response = self.client.chat(
+                message=message,
+                documents=documents
+            )
+            return response.text
+        except Exception as e:
+            raise ValueError(f"Cohere chat failed: {str(e)}")

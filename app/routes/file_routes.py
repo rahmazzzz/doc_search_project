@@ -1,37 +1,41 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from tempfile import NamedTemporaryFile
+import logging
+
 from app.container.core_container import container
 from app.deps import get_current_user
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
 
 @router.post("/upload")
 async def upload_file(
     file: UploadFile = File(...),
     user: dict = Depends(get_current_user)
 ):
-    # Save file to temp location
-    with NamedTemporaryFile(delete=False) as tmp:
-        tmp.write(await file.read())
-        tmp_path = tmp.name
+    logger.info("Received file upload from user: %s", user["username"])
 
-    # Extract and embed text
     try:
-        text = container.processing_service.extract_text_from_pdf(tmp_path)
-        chunks = container.processing_service.split_text(text)
-        embeddings = container.processing_service.embed_texts(chunks)
+        # Save uploaded file temporarily
+        with NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            tmp.write(await file.read())
+            tmp_path = tmp.name
+        logger.info("Temporary file saved at: %s", tmp_path)
     except Exception as e:
+        logger.exception("Failed to save uploaded file")
+        raise HTTPException(status_code=500, detail="Failed to save file.")
+
+    try:
+        # Delegate all processing to llm_service
+        file_id = await container.llm_service.process_upload(
+            file_path=tmp_path,
+            file_name=file.filename,
+            username=user["username"]
+        )
+    except Exception as e:
+        logger.exception("Error during file processing")
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
-
-    # Prepare metadata with user from token
-    metadata = [{"text": chunk, "username": user["username"]} for chunk in chunks]
-    container.qdrant_service.insert_vectors(embeddings, metadata)
-
-    # Save file info to Mongo
-    file_id = await container.mongo_service.save_file({
-        "filename": file.filename,
-        "username": user["username"]
-    })
 
     return {
         "message": "File uploaded and processed successfully",
