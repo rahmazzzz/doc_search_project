@@ -2,11 +2,13 @@ from typing import List
 import fitz  # PyMuPDF
 import logging
 from langchain.text_splitter import CharacterTextSplitter
+
 from app.clients.cohere_client import CohereEmbeddingClient
 from app.services.mongo_service import MongoService
 from app.services.qdrant_service import QdrantService
 
 logger = logging.getLogger(__name__)
+
 
 class ProcessingService:
     def __init__(
@@ -58,7 +60,7 @@ class ProcessingService:
             question_embedding = self.embed_texts([question])[0]
 
             # 2. Search Qdrant for top matching chunks
-            results = self.qdrant_service.search_vectors(query_vector=question_embedding, top_k=5)
+            results = self.qdrant_service.search(query_vector=question_embedding, top_k=5)
             if not results:
                 return {"error": "No relevant chunks found to answer the question."}
 
