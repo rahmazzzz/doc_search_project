@@ -2,6 +2,9 @@ from app.clients.mongo_client import MongoDBClient
 from app.clients.qdrant_client import QdrantDBClient
 from app.clients.cohere_client import CohereEmbeddingClient
 
+from app.repositories.mongo_repository import MongoRepository
+from app.repositories.qdrant_repository import QdrantRepository
+
 from app.services.mongo_service import MongoService
 from app.services.qdrant_service import QdrantService
 from app.services.processing import ProcessingService
@@ -25,11 +28,15 @@ cohere_client = CohereEmbeddingClient(
     api_key=settings.COHERE_API_KEY
 )
 
-# Initialize services
-mongo_service = MongoService(mongo_client)
-qdrant_service = QdrantService(qdrant_client)
+# Initialize repositories
+mongo_repository = MongoRepository(mongo_client)
+qdrant_repository = QdrantRepository(qdrant_client)
 
-# Pass all needed services to ProcessingService
+# Initialize services
+mongo_service = MongoService(mongo_repository)
+qdrant_service = QdrantService(qdrant_repository)
+
+# Processing service uses both mongo and qdrant services + cohere client
 processing_service = ProcessingService(
     cohere_client=cohere_client,
     mongo_service=mongo_service,
@@ -39,10 +46,16 @@ processing_service = ProcessingService(
 # Dependency container
 class Container:
     def __init__(self):
+        self.mongo_client = mongo_client
+        self.qdrant_client = qdrant_client
+        self.cohere_client = cohere_client
+
+        self.mongo_repository = mongo_repository
+        self.qdrant_repository = qdrant_repository
+
         self.mongo_service = mongo_service
         self.qdrant_service = qdrant_service
         self.processing_service = processing_service
-        self.cohere_client = cohere_client  # Optional: exposed in case needed directly
 
 # Exported container instance
 container = Container()
