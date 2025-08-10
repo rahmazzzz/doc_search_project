@@ -1,8 +1,15 @@
-from typing import List
-from app.clients.qdrant_client import QdrantDBClient
-from qdrant_client.models import PointStruct, VectorParams, Distance
-import uuid
+from typing import List, Optional
+from app.clients.vectordb_client import QdrantDBClient
+from qdrant_client.models import (
+    PointStruct,
+    VectorParams,
+    Distance,
+    Filter,
+    FieldCondition,
+    MatchValue
+)
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +33,17 @@ class QdrantRepository:
                 )
             )
 
-    def insert_vectors(self, points: List[PointStruct]):
-        logger.info("Inserting %d vectors into Qdrant...", len(points))
+    def insert_vectors(self, embeddings, payloads):
+        logger.info("Inserting %d vectors into Qdrant...", len(embeddings))
         try:
+            points = [
+                PointStruct(
+                    id=str(uuid.uuid4()),
+                    vector=embedding,
+                    payload=payload
+                )
+                for embedding, payload in zip(embeddings, payloads)
+            ]
             self.client.upsert(
                 collection_name=self.collection_name,
                 points=points
@@ -39,6 +54,7 @@ class QdrantRepository:
             raise
 
     def delete_collection(self):
+        """Deletes the entire Qdrant collection (use with caution)."""
         try:
             self.client.delete_collection(collection_name=self.collection_name)
             logger.info(f"Deleted Qdrant collection '{self.collection_name}'")
@@ -46,15 +62,41 @@ class QdrantRepository:
             logger.error(f"Error deleting Qdrant collection: {e}")
             raise
 
-    def search_vectors(self, query_vector: List[float], top_k: int = 5):
+    def delete_vectors(self, q_filter: Filter):
+        """Deletes only the points matching the provided filter."""
+        try:
+            self.client.delete(
+                collection_name=self.collection_name,
+                points_selector=q_filter
+            )
+            logger.info(f"Deleted vectors from Qdrant matching filter: {q_filter}")
+        except Exception as e:
+            logger.error(f"Error deleting filtered vectors in Qdrant: {e}")
+            raise
+
+    def search_vectors(self, query_vector: List[float], top_k: int = 5, username: Optional[str] = None):
         try:
             logger.info(f"Searching top {top_k} vectors from Qdrant...")
+
+            q_filter = None
+            if username:
+                q_filter = Filter(
+                    must=[
+                        FieldCondition(
+                            key="username",
+                            match=MatchValue(value=username)
+                        )
+                    ]
+                )
+
             results = self.client.search(
                 collection_name=self.collection_name,
                 query_vector=query_vector,
-                limit=top_k
+                limit=top_k,
+                query_filter=q_filter
             )
             return results
+
         except Exception as e:
             logger.error(f"Error searching vectors in Qdrant: {e}")
             raise
