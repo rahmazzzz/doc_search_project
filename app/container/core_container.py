@@ -1,4 +1,4 @@
-from app.clients.sqldb_client import MongoDBClient
+from app.clients.nosqldb_client import MongoDBClient
 from app.clients.vectordb_client import QdrantDBClient
 from app.clients.cohere_client import CohereEmbeddingClient
 
