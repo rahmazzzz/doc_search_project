@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Query
-from app.deps import get_current_user
+from app.security.deps import get_current_user
 from app.container.core_container import container
 
 router = APIRouter()

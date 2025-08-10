@@ -14,11 +14,11 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         if username is None:
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
-        user = await container.mongo_service.get_user_by_username(username)
+        user = await container.mongo_repository.get_user_by_username(username)
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
-        # ✅ Add 'id' to user dict for convenience
+        
         user["id"] = str(user["_id"])
 
         return user

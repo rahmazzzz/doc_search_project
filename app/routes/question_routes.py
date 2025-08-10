@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from app.deps import get_current_user
+from app.security.deps import get_current_user
 from app.container.core_container import container
 from app.models.user import User
 

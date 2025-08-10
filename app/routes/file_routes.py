@@ -3,11 +3,10 @@ from tempfile import NamedTemporaryFile
 import logging
 
 from app.container.core_container import container
-from app.deps import get_current_user
+from app.security.deps import get_current_user
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
 
 @router.post("/upload")
 async def upload_file(
@@ -28,7 +27,7 @@ async def upload_file(
     logger.debug("Temporary file saved at: %s", tmp_path)
 
     # Service handles all validation & exceptions
-    file_id = await container.file_search_service.process_upload(
+    file_id = await container.file_processing_service.process_upload(
         file_path=tmp_path,
         file_name=file.filename,
         username=username

@@ -1,4 +1,4 @@
-from app.clients.mongo_client import MongoDBClient
+from app.clients.sqldb_client import MongoDBClient
 
 class MongoRepository:
     def __init__(self, mongo_client: MongoDBClient):

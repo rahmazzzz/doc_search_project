@@ -1,7 +1,7 @@
 import logging
 from app.clients.cohere_client import CohereEmbeddingClient
-from app.services.qdrant_service import QdrantService
-from app.services.mongo_service import MongoService
+from app.repositories.qdrant_repository import QdrantRepository
+from app.repositories.mongo_repository import MongoRepository
 from app.services.semantic_search import SemanticSearchService
 from app.prompts.english_prompt import generate_english_prompt
 from app.prompts.arabic_prompt import generate_arabic_prompt
@@ -13,13 +13,13 @@ class LLMSearchService:
         self,
         semantic_search_service: SemanticSearchService,
         cohere_client: CohereEmbeddingClient,
-        qdrant_service: QdrantService,
-        mongo_service: MongoService,
+        qdrant_repository: QdrantRepository,
+        mongo_repository: MongoRepository,
     ):
         self.semantic_search_service = semantic_search_service
         self.cohere_client = cohere_client
-        self.qdrant_service = qdrant_service
-        self.mongo_service = mongo_service
+        self.qdrant_repository = qdrant_repository
+        self.mongo_repository = mongo_repository
 
     async def answer_question(self, user_id: str, question: str, language: str = "english") -> dict:
         try:
@@ -27,7 +27,7 @@ class LLMSearchService:
             embedding = self.cohere_client.embed([question])[0]
 
             # Search Qdrant for relevant context by user_id
-            results = self.qdrant_service.search(embedding, username=user_id)
+            results = self.qdrant_repository.search_vectors(embedding, username=user_id)
             if not results:
                 return {"error": "No relevant context found."}
 
