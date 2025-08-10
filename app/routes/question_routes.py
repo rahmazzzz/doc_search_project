@@ -11,7 +11,7 @@ class QuestionRequest(BaseModel):
 
 @router.post("/ask")
 async def ask_question(request: QuestionRequest, current_user: dict = Depends(get_current_user)):
-    result = await container.llm_service.answer_question(
+    result = await container.llm_search_service.answer_question(
         user_id=current_user["username"],
         question=request.question
     )

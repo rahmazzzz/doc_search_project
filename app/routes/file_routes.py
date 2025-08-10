@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
+from fastapi import APIRouter, UploadFile, File, Depends
 from tempfile import NamedTemporaryFile
 import logging
 
@@ -14,29 +14,27 @@ async def upload_file(
     file: UploadFile = File(...),
     user: dict = Depends(get_current_user)
 ):
-    logger.info("Received file upload from user: %s", user["username"])
+    """
+    Handles PDF file uploads for the authenticated user.
+    Delegates validation, saving, and processing to the service layer.
+    """
+    username = user.get("username")
+    logger.info("Received file upload from user: %s", username)
 
-    try:
-        # Save uploaded file temporarily
-        with NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-            tmp.write(await file.read())
-            tmp_path = tmp.name
-        logger.info("Temporary file saved at: %s", tmp_path)
-    except Exception as e:
-        logger.exception("Failed to save uploaded file")
-        raise HTTPException(status_code=500, detail="Failed to save file.")
+    # Save uploaded file temporarily
+    with NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+    logger.debug("Temporary file saved at: %s", tmp_path)
 
-    try:
-        # Delegate all processing to llm_service
-        file_id = await container.llm_service.process_upload(
-            file_path=tmp_path,
-            file_name=file.filename,
-            username=user["username"]
-        )
-    except Exception as e:
-        logger.exception("Error during file processing")
-        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+    # Service handles all validation & exceptions
+    file_id = await container.file_search_service.process_upload(
+        file_path=tmp_path,
+        file_name=file.filename,
+        username=username
+    )
 
+    logger.info("File processed successfully for user: %s, file_id: %s", username, file_id)
     return {
         "message": "File uploaded and processed successfully",
         "file_id": str(file_id)

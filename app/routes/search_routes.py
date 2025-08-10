@@ -6,5 +6,5 @@ router = APIRouter()
 
 @router.get("/")
 async def search(q: str = Query(..., min_length=1), user: dict = Depends(get_current_user)):
-    results = await container.llm_service.semantic_search(query=q, username=user["username"])
-    return results
+   results = await container.semantic_search_service.search(query=q, username=user["username"])
+   return results

@@ -7,44 +7,43 @@ from app.repositories.qdrant_repository import QdrantRepository
 
 from app.services.mongo_service import MongoService
 from app.services.qdrant_service import QdrantService
-from app.services.embedding import EmbeddingService
-from app.services.llm import LLMService
+
+from app.services.file_processing import FileProcessingService
+from app.services.semantic_search import SemanticSearchService
+from app.services.llm_search import LLMSearchService
 
 from app.core.config import settings
 
-# Initialize database clients
-mongo_client = MongoDBClient(
-    uri=settings.MONGO_URI,
-    db_name=settings.MONGODB_DATABASE
-)
-
+# Clients
+mongo_client = MongoDBClient(uri=settings.MONGO_URI, db_name=settings.MONGODB_DATABASE)
 qdrant_client = QdrantDBClient(
     url=settings.QDRANT_URL,
     api_key=settings.QDRANT_API_KEY,
-    collection_name=settings.QDRANT_COLLECTION
+    collection_name=settings.QDRANT_COLLECTION,
 )
+cohere_client = CohereEmbeddingClient(api_key=settings.COHERE_API_KEY)
 
-# Initialize embedding client
-cohere_client = CohereEmbeddingClient(
-    api_key=settings.COHERE_API_KEY
-)
-
-# Initialize repositories
+# Repositories
 mongo_repository = MongoRepository(mongo_client)
 qdrant_repository = QdrantRepository(qdrant_client)
 
-# Initialize services
+# Services
 mongo_service = MongoService(mongo_repository)
 qdrant_service = QdrantService(qdrant_repository)
-embedding_service = EmbeddingService(cohere_client=cohere_client)
-llm_service = LLMService(
-    qdrant_service=qdrant_service,
-    cohere_client=cohere_client,
-    embedding_service=embedding_service,
-    mongo_service=mongo_service
+semantic_search_service = SemanticSearchService(cohere_client=cohere_client, qdrant_service=qdrant_service)
+
+file_processing_service = FileProcessingService(
+    mongo_service=mongo_service,
+    semantic_search_service=semantic_search_service,  # <-- Added here
 )
 
-# Dependency container
+llm_search_service = LLMSearchService(
+    semantic_search_service=semantic_search_service,
+    cohere_client=cohere_client,
+    qdrant_service=qdrant_service,
+    mongo_service=mongo_service,
+)
+
 class Container:
     def __init__(self):
         self.mongo_client = mongo_client
@@ -56,8 +55,12 @@ class Container:
 
         self.mongo_service = mongo_service
         self.qdrant_service = qdrant_service
-        self.embedding_service = embedding_service
-        self.llm_service = llm_service
+        self.semantic_search_service = semantic_search_service
 
-# Exported container instance
+        self.file_processing_service = file_processing_service
+        self.llm_search_service = llm_search_service
+
+        # Alias for your route usage if needed
+        self.file_search_service = file_processing_service
+
 container = Container()
