@@ -1,53 +1,80 @@
 import logging
-from app.clients.cohere_client import CohereEmbeddingClient
+from app.clients.cohere_embedding_client import CohereEmbeddingClient
 from app.repositories.qdrant_repository import QdrantRepository
 from app.repositories.mongo_repository import MongoRepository
+from app.repositories.prompt_repository import PromptRepository
 from app.services.semantic_search import SemanticSearchService
-from app.prompts.english_prompt import generate_english_prompt
-from app.prompts.arabic_prompt import generate_arabic_prompt
 
 logger = logging.getLogger(__name__)
 
 class LLMSearchService:
     def __init__(
         self,
-        semantic_search_service: SemanticSearchService,
-        cohere_client: CohereEmbeddingClient,
-        qdrant_repository: QdrantRepository,
-        mongo_repository: MongoRepository,
+        semantic_search_service,
+        cohere_embedding_client,
+        cohere_chat_client,
+        qdrant_repository,
+        mongo_repository,
+        prompt_repository
     ):
         self.semantic_search_service = semantic_search_service
-        self.cohere_client = cohere_client
+        self.cohere_embedding_client = cohere_embedding_client
+        self.cohere_chat_client = cohere_chat_client
         self.qdrant_repository = qdrant_repository
         self.mongo_repository = mongo_repository
+        self.prompt_repository = prompt_repository
 
-    async def answer_question(self, user_id: str, question: str, language: str = "english") -> dict:
+    async def answer_question(
+        self,
+        user_id: str,
+        question: str,
+        prompt_name: str = "default",
+        language: str = "english",
+        file_id: str = None
+    ) -> dict:
+        """
+        Search relevant context from vector DB, build prompt from MongoDB template,
+        and get an answer from the LLM.
+        """
         try:
-            # Embed the question
-            embedding = self.cohere_client.embed([question])[0]
+            # 1. Fetch prompt template from MongoDB
+            prompt_doc = await self.prompt_repository.get_prompt_by_name(prompt_name)
+            if not prompt_doc:
+                return {"error": f"No prompt found with name '{prompt_name}'"}
 
-            # Search Qdrant for relevant context by user_id
-            results = self.qdrant_repository.search_vectors(embedding, username=user_id)
+            system_text = prompt_doc.get("system", "")
+            user_template = prompt_doc.get("user", "")
+
+            # 2. Embed the question
+            embedding = self.cohere_embedding_client.embed([question])
+            query_vector = embedding[0]
+
+            # 3. Search Qdrant for relevant chunks
+            results = self.qdrant_repository.search_vectors(
+                query_vector=query_vector,
+                file_id=file_id,
+                top_k=5
+            )
             if not results:
                 return {"error": "No relevant context found."}
 
-            # Extract top 3 text chunks as context
-            context = "\n".join(hit.payload["text"] for hit in results[:3])
+            # 4. Extract clean text chunks
+            context_chunks = []
+            for hit in results[:3]:
+                text_chunk = hit.payload.get("text", "")
+                context_chunks.append(str(text_chunk))
+            context = "\n".join(context_chunks)
 
-            # Generate prompt based on language
-            if language.lower() == "arabic":
-                prompt = generate_arabic_prompt(question, context)
-            else:
-                prompt = generate_english_prompt(question, context)
+            # 5. Build the final prompt by replacing placeholders
+            final_user_prompt = user_template.format(question=question, context=context)
 
-            # Send prompt to Cohere chat and get response
-            response = self.cohere_client.chat(
-                message=prompt,
-                documents=[]
-            )
+            # 6. Call Cohere LLM
+            response = self.cohere_chat_client.chat(message=final_user_prompt, system=system_text)
 
             return {"answer": response}
 
         except Exception as e:
-            logger.error(f"Failed to answer question: {e}")
+            logger.exception("Failed to answer question")
             return {"error": f"Failed to answer question: {str(e)}"}
+
+    

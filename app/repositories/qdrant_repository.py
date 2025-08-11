@@ -33,14 +33,14 @@ class QdrantRepository:
                 )
             )
 
-    def insert_vectors(self, embeddings, payloads):
+    def insert_vectors(self, embeddings, payloads, file_id: Optional[str] = None):
         logger.info("Inserting %d vectors into Qdrant...", len(embeddings))
         try:
             points = [
                 PointStruct(
                     id=str(uuid.uuid4()),
                     vector=embedding,
-                    payload=payload
+                    payload={**payload, "file_id": file_id} if file_id is not None else payload
                 )
                 for embedding, payload in zip(embeddings, payloads)
             ]
@@ -74,17 +74,17 @@ class QdrantRepository:
             logger.error(f"Error deleting filtered vectors in Qdrant: {e}")
             raise
 
-    def search_vectors(self, query_vector: List[float], top_k: int = 5, username: Optional[str] = None):
+    def search_vectors(self, query_vector: List[float], top_k: int = 5, file_id: Optional[str] = None):
         try:
             logger.info(f"Searching top {top_k} vectors from Qdrant...")
 
             q_filter = None
-            if username:
+            if file_id:
                 q_filter = Filter(
                     must=[
                         FieldCondition(
-                            key="username",
-                            match=MatchValue(value=username)
+                            key="file_id",
+                            match=MatchValue(value=file_id)
                         )
                     ]
                 )
