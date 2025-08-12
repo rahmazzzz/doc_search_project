@@ -36,5 +36,12 @@ async def upload_file(
     logger.info("File processed successfully for user: %s, file_id: %s", username, file_id)
     return {
         "message": "File uploaded and processed successfully",
-        "file_id": str(file_id)
-    }
+        "file_id": str(file_id)}
+    
+
+    
+
+@router.get("/files")
+async def get_all_file(current_user: dict = Depends(get_current_user)):
+    files = await container.mongo_repository.get_all_files_metadata()
+    return {"files": files}
