@@ -28,7 +28,7 @@ class FileProcessingService:
             logger.error(f"Failed to extract text from PDF: {e}")
             raise
 
-    async def process_upload(self, file_path: str, file_name: str, username: str):
+    async def process_upload(self, file_path: str, file_name: str,user_id: str, username: str):
         """
         Process a PDF upload:
         0. Save the file content + metadata in MongoDB (as binary + fields)
@@ -40,7 +40,7 @@ class FileProcessingService:
         logger.info(f"Starting file upload process for '{file_name}' by user '{username}'")
 
         # 0. Save the PDF file content + metadata to MongoDB
-        file_id = await self.mongo_repository.save_file(file_path, file_name, username)
+        file_id = await self.mongo_repository.save_file(file_path, file_name,user_id ,username)
         logger.info(f"Saved file '{file_name}' content to MongoDB with id {file_id}")
 
         # 1. Extract raw text from the PDF
@@ -62,7 +62,7 @@ class FileProcessingService:
             raise ValueError("Failed to embed text chunks.")
 
         # 4. Store embeddings and chunks in Qdrant
-        metadata = {"username": username, "filename": file_name}  # metadata without file_id
+        metadata = {"username": username, "user_id": user_id, "filename": file_name}  # metadata without file_id
         chunks_payloads = [{"text": chunk, **metadata, "file_id": str(file_id)} for chunk in chunks]
 
         await self.semantic_search_service.store_vectors(
@@ -73,14 +73,16 @@ class FileProcessingService:
         )
         return file_id
 
-    # New method to get all file IDs
-    async def get_all_file_ids(self) -> list:
-        """
-        Return a list of all file IDs stored in MongoDB.
-        """
-        try:
-            file_ids = await self.mongo_repository.get_all_file_ids()
-            return file_ids
-        except Exception as e:
-            logger.error(f"Failed to get all file IDs: {e}")
-            raise
+# New method to get all file IDs
+async def get_all_file_ids(self) -> list:
+    """
+    Return a list of all file IDs and their associated user IDs stored in MongoDB.
+    """
+    try:
+        file_info_list = await self.mongo_repository.get_all_file_ids()  
+        # Expecting a list of dicts: [{"file_id": "...", "user_id": "..."}, ...]
+        return file_info_list
+    except Exception as e:
+        logger.error(f"Failed to get all file IDs and user IDs: {e}")
+        raise
+
