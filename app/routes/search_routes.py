@@ -11,7 +11,6 @@ async def semantic_search_route(
     file_id: str = Query(None, description="Optional MongoDB file ID to filter results"),
     current_user: dict = Depends(get_current_user)
 ):
-    # Validate file_id if provided
     if file_id:
         try:
             ObjectId(file_id)
@@ -21,7 +20,7 @@ async def semantic_search_route(
     try:
         results = await container.semantic_search_service.search(
             query=query,
-            username=current_user["username"],
+            username=current_user["sub"],  # <-- change here
             file_id=file_id
         )
         return {"matches": results}

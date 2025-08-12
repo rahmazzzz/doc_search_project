@@ -9,12 +9,12 @@ router = APIRouter()
 
 class QuestionRequest(BaseModel):
     question: str
-    file_id: str   # <-- add optional file_id here
+    file_id: str   
     prompt_name: str
 @router.post("/ask")
 async def ask_question(request: QuestionRequest, current_user: dict = Depends(get_current_user)):
     result = await container.llm_search_service.answer_question(
-        user_id=current_user["username"],
+        user_id=current_user["sub"],
         question=request.question,
         file_id=request.file_id,
         prompt_name=request.prompt_name, 
