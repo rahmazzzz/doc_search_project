@@ -1,7 +1,7 @@
 import logging
 from typing import List
 from langchain.text_splitter import CharacterTextSplitter
-from app.clients.cohere_client import CohereEmbeddingClient
+from app.clients.cohere_embedding_client import CohereEmbeddingClient
 from app.repositories.qdrant_repository import QdrantRepository
 from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue  # Add these imports
 import uuid  # Also import uuid if not already imported
@@ -54,7 +54,7 @@ class SemanticSearchService:
 
         self.qdrant_repository.delete_collection(filter=q_filter)
 
-    async def store_vectors(self, embeddings: List[List[float]], chunks: List[str], metadata: dict):
+    async def store_vectors(self, embeddings: List[List[float]], chunks: List[str], metadata: dict, file_id: str):
         try:
             payloads = []
             for i, chunk in enumerate(chunks):
@@ -66,19 +66,19 @@ class SemanticSearchService:
                 payloads.append(payload)
 
             logger.info(f"Inserting {len(embeddings)} vectors into Qdrant")
-            self.qdrant_repository.insert_vectors(embeddings, payloads)
+            self.qdrant_repository.insert_vectors(embeddings, payloads, file_id)
         except Exception as e:
             logger.error(f"Failed to store vectors: {e}")
             raise
 
-    async def search(self, query: str, username: str):
+    async def search(self, query: str, username: str, file_id: str):
         try:
             query_embedding = self.cohere_client.embed([query])[0]
             logger.debug(f"Query embedding length: {len(query_embedding)}")
             
             results = self.qdrant_repository.search_vectors(
                 query_vector=query_embedding,
-                username=username,
+                file_id=file_id,
                 top_k=5
             )
             logger.debug(f"Qdrant search results: {results}")

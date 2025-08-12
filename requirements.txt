@@ -13,3 +13,4 @@ python-jose[cryptography]
 pydantic[email]
 langchain
 pyPDF2
+aiofiles
