@@ -1,21 +1,17 @@
 import cohere
-from typing import List
+from typing import List, Optional
+from .llm_interface import LLMChatInterface
 
-class CohereChatClient:
+class CohereChatClient(LLMChatInterface):
     def __init__(self, api_key: str):
-        self.api_key = api_key
         self.client = cohere.Client(api_key)
 
-    def chat(self, message: str, documents: List[dict] = None, system: str = "") -> str:
-        """
-        Chat with Cohere's LLM.
-        'documents' is an optional list of dicts with a 'text' key.
-        """
+    def chat(self, message: str, documents: Optional[List[dict]] = None, system: str = "") -> str:
         try:
             response = self.client.chat(
                 message=message,
                 documents=documents,
-                preamble=system  # System prompt in Cohere
+                preamble=system
             )
             return response.text
         except Exception as e:
