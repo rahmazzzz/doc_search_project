@@ -1,7 +1,8 @@
 from app.clients.nosqldb_client import MongoDBClient
 from bson.binary import Binary
 import aiofiles
-from typing import List
+from typing import List, Dict
+from datetime import datetime
 
 class MongoRepository:
     def __init__(self, mongo_client: MongoDBClient):
@@ -10,6 +11,7 @@ class MongoRepository:
         self.documents_collection = self.db["documents"]
         self.prompts_collection = self.db["prompt"]
         self.files_collection = self.db["uploaded_files"]
+        self.chat_collection = self.db["chat_history"]  
 
     async def insert_chunks(self, chunks: list):
         result = await self.documents_collection.insert_many(chunks)
@@ -36,7 +38,7 @@ class MongoRepository:
         result = await self.files_collection.insert_one(file_doc)
         return result.inserted_id
 
-    async def get_all_files_metadata(self,user_id: str) -> list:
+    async def get_all_files_metadata(self, user_id: str) -> list:
         cursor = self.files_collection.find(
             {"user_id": user_id},
             {"_id": 1, "filename": 1, "username": 1, "user_id": 1}
@@ -50,3 +52,25 @@ class MongoRepository:
                 "user_id": str(doc.get("user_id", ""))
             })
         return files
+
+    async def get_chat_history(self, user_id: str, provider: str) -> List[Dict[str, str]]:
+        """
+        Retrieves stored chat messages for a given user & provider.
+        """
+        doc = await self.chat_collection.find_one({"user_id": user_id, "provider": provider})
+        return doc.get("messages", []) if doc else []
+
+    async def save_chat_history(self, user_id: str, provider: str, messages: List[Dict[str, str]]):
+        """
+        Saves or updates the chat history for a user & provider.
+        """
+        await self.chat_collection.update_one(
+            {"user_id": user_id, "provider": provider},
+            {
+                "$set": {
+                    "messages": messages,
+                    "updated_at": datetime.utcnow()
+                }
+            },
+            upsert=True
+        )
