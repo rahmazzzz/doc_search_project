@@ -14,3 +14,4 @@ pydantic[email]
 langchain
 pyPDF2
 aiofiles
+openai
