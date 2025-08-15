@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 from app.clients.llm_factory import LLMChatFactory
 from app.core.config import settings
@@ -18,6 +18,7 @@ class LLMSearchService:
     - Retrieving the appropriate prompt template
     - Performing semantic search for relevant chunks
     - Calling the selected LLM provider to generate a response
+    - Storing and retrieving conversation history
     """
 
     def __init__(
@@ -42,61 +43,88 @@ class LLMSearchService:
         prompt_name: str = "default",
         language: str = "english",
         provider_name: Optional[str] = None,
+        chat_history: Optional[List[Dict[str, str]]] = None,
     ) -> Dict[str, Any]:
         """
-        Answer a question using the specified LLM provider.
-
-        :param user_id: ID of the current user
-        :param question: User's question
-        :param file_id: Optional file ID for context restriction
-        :param prompt_name: Name of the prompt template
-        :param language: Language of the response
-        :param provider_name: Which LLM to use ("cohere" or "openai")
+        Answer a question using the specified LLM provider, maintaining conversation history.
+        Supports multi-turn chat by passing accumulated history to the LLM.
         """
         try:
             provider = (provider_name or settings.LLM_PROVIDER).lower()
-
-            # 1. Instantiate LLM client for this request
             llm_client = LLMChatFactory.get_client(provider)
 
-            # 2. Fetch prompt template
+            # 1. Get prompt template
             prompt_doc = await self.prompt_repository.get_prompt_by_name(prompt_name)
             if not prompt_doc:
                 return {"error": f"No prompt found with name '{prompt_name}'"}
 
             system_text = prompt_doc.get("system", "")
-            user_template = prompt_doc.get("user", "")
+            user_template = prompt_doc.get("user", "{question}")
 
-            # 3. Embed the question
+            # 2. Retrieve or use provided chat history
+            if chat_history is None:
+                chat_history = await self.mongo_repository.get_chat_history(user_id, provider)
+
+            # ✅ Normalize history to always have lowercase role + "content"
+            normalized_history = []
+            for msg in chat_history:
+                role = msg.get("role", "").lower()
+                if "content" in msg:
+                    normalized_history.append({"role": role, "content": msg["content"]})
+                elif "message" in msg:  # Cohere old format
+                    normalized_history.append({"role": role, "content": msg["message"]})
+                else:
+                    normalized_history.append({"role": role, "content": ""})
+            chat_history = normalized_history
+
+            # 3. Retrieve relevant context
             embedding = self.cohere_embedding_client.embed([question])
             query_vector = embedding[0]
-
-            # 4. Search for relevant chunks
             results = self.qdrant_repository.search_vectors(
                 query_vector=query_vector,
                 file_id=file_id,
                 top_k=5
             )
-            if not results:
-                return {"error": "No relevant context found."}
 
-            # 5. Extract top chunks
-            context_chunks = [
-                str(hit.payload.get("text", "")) for hit in results[:3]
-            ]
+            context_chunks = [str(hit.payload.get("text", "")) for hit in results[:3]] if results else []
             context = "\n".join(context_chunks)
 
-            # 6. Build the user prompt
+            # 4. Build user prompt for this turn
             final_user_prompt = user_template.format(
                 question=question,
                 context=context,
                 language=language
             )
 
-            # 7. Call the LLM
-            response_text =  llm_client.chat(
-     message=final_user_prompt,
-    system=system_text)
+            # 5. Append user message
+            chat_history.append({"role": "user", "content": final_user_prompt})
+
+            # 6. Convert chat history to provider-specific format
+            if provider == "cohere":
+                messages_for_llm = []
+                for msg in chat_history:
+                    if msg["role"] == "user":
+                        messages_for_llm.append({"role": "USER", "message": msg["content"]})
+                    elif msg["role"] == "assistant":
+                        messages_for_llm.append({"role": "CHATBOT", "message": msg["content"]})
+                    else:
+                        messages_for_llm.append({"role": "SYSTEM", "message": msg["content"]})
+            else:
+                # OpenAI / others
+                messages_for_llm = [{"role": m["role"], "content": m["content"]} for m in chat_history]
+
+            # 7. Call LLM with full history
+            response_text = await llm_client.chat(
+                messages=messages_for_llm,
+                system=system_text,
+                documents=None
+            )
+
+            # 8. Append assistant message
+            chat_history.append({"role": "assistant", "content": response_text})
+
+            # 9. Save updated history
+            await self.mongo_repository.save_chat_history(user_id, provider, chat_history)
 
             return {"answer": response_text}
 

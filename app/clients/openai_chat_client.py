@@ -1,5 +1,5 @@
 import openai
-from typing import List, Optional
+from typing import List, Dict, Optional
 from app.clients.llm_interface import LLMChatInterface
 
 class OpenAIChatClient(LLMChatInterface):
@@ -7,25 +7,31 @@ class OpenAIChatClient(LLMChatInterface):
         self.client = openai.OpenAI(api_key=api_key)
         self.model = model
 
-    def chat(self, message: str, documents: Optional[List[dict]] = None, system: str = "") -> str:
+    async def chat(
+        self,
+        messages: List[Dict[str, str]],
+        system: Optional[str] = None,
+        documents: Optional[List[dict]] = None
+    ) -> str:
         """
-        Uses the new OpenAI SDK (>=1.0.0) chat interface.
-        Matches the CohereChatClient interface.
+        Multi-turn chat using OpenAI's API with support for optional RAG context.
         """
         try:
-            # Combine documents into context string
-            context = ""
+            # Append RAG context to the latest user message if provided
             if documents:
-                context = "\n\n".join([doc.get("text", "") for doc in documents])
+                context_text = "\n\n".join([doc.get("text", "") for doc in documents])
+                messages[-1]["content"] += f"\n\nContext:\n{context_text}"
 
-            user_message = f"{message}\n\nContext:\n{context}" if context else message
+            # Insert system message at start if provided
+            final_messages = []
+            if system:
+                final_messages.append({"role": "system", "content": system})
+            final_messages.extend(messages)
 
-            response = self.client.chat.completions.create(
+            # OpenAI SDK >= 1.0.0 async call
+            response = await self.client.chat.completions.create(
                 model=self.model,
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user_message}
-                ],
+                messages=final_messages,
                 max_tokens=300
             )
 

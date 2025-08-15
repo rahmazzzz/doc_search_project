@@ -1,10 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
-from typing import Optional
+from typing import Optional, List, Dict
 
 from app.security.deps import get_current_user
 from app.container.core_container import container
-from app.models.user import User
 
 router = APIRouter()
 
@@ -22,25 +21,43 @@ class QuestionRequest(BaseModel):
         return v.lower() if v else "cohere"
 
 
-@router.post("/ask")
+@router.post("/chat")
 async def ask_question(
     request: QuestionRequest,
     current_user: dict = Depends(get_current_user)
 ):
-    """
-    Route delegates orchestration to LLMSearchService.
-    LLMSearchService will pick the LLM client via LLMChatFactory based on provider_name.
-    """
-    # Use container's llm_search_service and pass provider_name to the service method
-    result = await container.llm_search_service.answer_question(
-        user_id=current_user["sub"],
-        provider_name=request.provider_name,
-        question=request.question,
-        prompt_name=request.prompt_name,
-        file_id=request.file_id
+    user_id = current_user["sub"]
+    provider = request.provider_name
+
+    # Fetch previous history
+    history: List[Dict[str, str]] = await container.mongo_repository.get_chat_history(
+        user_id, provider
     )
 
-    if "error" in result:
-        raise HTTPException(status_code=400, detail=result["error"])
+    # Append new user message
+    history.append({"role": "user", "content": request.question})
 
-    return result
+    # Call LLM with chat history
+    try:
+        reply = await container.llm_search_service.answer_question(
+            user_id=user_id,
+            provider_name=provider,
+            question=request.question,
+            prompt_name=request.prompt_name,
+            file_id=request.file_id,
+            chat_history=history  # renamed param
+        )
+    except TypeError:
+        raise HTTPException(status_code=500, detail="LLM service signature mismatch")
+
+    if not reply or "answer" not in reply:
+        raise HTTPException(status_code=400, detail=reply.get("error", "Unknown error"))
+
+    # Append assistant reply
+    history.append({"role": "assistant", "content": reply["answer"]})
+
+    # Save updated chat history
+    await container.mongo_repository.save_chat_history(user_id, provider, history)
+
+    # Return latest assistant reply
+    return {"answer": reply["answer"]}

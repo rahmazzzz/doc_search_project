@@ -1,17 +1,26 @@
 from abc import ABC, abstractmethod
+from typing import List, Dict, Optional
 
 class LLMChatInterface(ABC):
     @abstractmethod
     async def chat(
-        self, user_id: str, question: str, file_id: str, prompt_name: str
-    ) -> dict:
+        self,
+        messages: List[Dict[str, str]],
+        system: Optional[str] = None,
+        documents: Optional[List[dict]] = None
+    ) -> str:
         """
-        Standard method for answering a question given:
-        - user_id
-        - question text
-        - file_id to search in
-        - prompt_name (for selecting prompt templates)
-        Returns a dict with either {'answer': str} or {'error': str}.
+        Multi-turn chat with an LLM.
+
+        Args:
+            messages: Conversation history as a list of dicts 
+                      [{"role": "user"/"assistant"/"system", "content": str}]
+            system: Optional system message to guide behavior.
+            documents: Optional retrieved documents for context (RAG).
+
+        Returns:
+            Assistant's reply as a string.
         """
         pass
+
 
