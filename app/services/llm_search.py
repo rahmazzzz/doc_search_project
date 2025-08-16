@@ -8,6 +8,13 @@ from app.repositories.qdrant_repository import QdrantRepository
 from app.repositories.mongo_repository import MongoRepository
 from app.repositories.prompt_repository import PromptRepository
 from app.services.semantic_search import SemanticSearchService
+from app.exceptions.llmsearch_exceptions import (
+    PromptNotFoundError,
+    ChatHistoryRetrievalError,
+    ContextRetrievalError,
+    LLMProviderError,
+    ChatHistorySaveError
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,51 +52,54 @@ class LLMSearchService:
         provider_name: Optional[str] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
     ) -> Dict[str, Any]:
-        """
-        Answer a question using the specified LLM provider, maintaining conversation history.
-        Supports multi-turn chat by passing accumulated history to the LLM.
-        """
         try:
             provider = (provider_name or settings.LLM_PROVIDER).lower()
             llm_client = LLMChatFactory.get_client(provider)
 
             # 1. Get prompt template
-            prompt_doc = await self.prompt_repository.get_prompt_by_name(prompt_name)
-            if not prompt_doc:
-                return {"error": f"No prompt found with name '{prompt_name}'"}
+            try:
+                prompt_doc = await self.prompt_repository.get_prompt_by_name(prompt_name) \
+                             or (_ for _ in ()).throw(PromptNotFoundError(prompt_name))
+            except PromptNotFoundError:
+                raise
+            except Exception as e:
+                logger.exception("Error retrieving prompt")
+                raise ContextRetrievalError(str(e))
 
             system_text = prompt_doc.get("system", "")
             user_template = prompt_doc.get("user", "{question}")
 
-            # 2. Retrieve or use provided chat history
-            if chat_history is None:
-                chat_history = await self.mongo_repository.get_chat_history(user_id, provider)
+            # 2. Retrieve chat history or use provided
+            try:
+                history_source = chat_history or await self.mongo_repository.get_chat_history(user_id, provider)
+                role_key_map = {
+                    True: "content",
+                    False: "message"
+                }
+                normalized_history = [
+                    {"role": msg.get("role", "").lower(),
+                     "content": msg.get(role_key_map["content" in msg], "")}
+                    for msg in history_source
+                ]
+                chat_history = normalized_history
+            except Exception as e:
+                logger.exception("Error retrieving chat history")
+                raise ChatHistoryRetrievalError(str(e))
 
-            # ✅ Normalize history to always have lowercase role + "content"
-            normalized_history = []
-            for msg in chat_history:
-                role = msg.get("role", "").lower()
-                if "content" in msg:
-                    normalized_history.append({"role": role, "content": msg["content"]})
-                elif "message" in msg:  # Cohere old format
-                    normalized_history.append({"role": role, "content": msg["message"]})
-                else:
-                    normalized_history.append({"role": role, "content": ""})
-            chat_history = normalized_history
+            # 3. Retrieve context
+            try:
+                query_vector = self.cohere_embedding_client.embed([question])[0]
+                results = self.qdrant_repository.search_vectors(
+                    query_vector=query_vector,
+                    file_id=file_id,
+                    top_k=5
+                )
+                context = "\n".join(map(lambda hit: str(hit.payload.get("text", "")), results[:3])) if results else ""
+            except Exception as e:
+                logger.exception("Error retrieving context for question")
+                raise ContextRetrievalError(str(e))
 
-            # 3. Retrieve relevant context
-            embedding = self.cohere_embedding_client.embed([question])
-            query_vector = embedding[0]
-            results = self.qdrant_repository.search_vectors(
-                query_vector=query_vector,
-                file_id=file_id,
-                top_k=5
-            )
-
-            context_chunks = [str(hit.payload.get("text", "")) for hit in results[:3]] if results else []
-            context = "\n".join(context_chunks)
-
-            # 4. Build user prompt for this turn
+            # 4. Build user prompt
             final_user_prompt = user_template.format(
                 question=question,
                 context=context,
@@ -99,35 +109,42 @@ class LLMSearchService:
             # 5. Append user message
             chat_history.append({"role": "user", "content": final_user_prompt})
 
-            # 6. Convert chat history to provider-specific format
-            if provider == "cohere":
-                messages_for_llm = []
-                for msg in chat_history:
-                    if msg["role"] == "user":
-                        messages_for_llm.append({"role": "USER", "message": msg["content"]})
-                    elif msg["role"] == "assistant":
-                        messages_for_llm.append({"role": "CHATBOT", "message": msg["content"]})
-                    else:
-                        messages_for_llm.append({"role": "SYSTEM", "message": msg["content"]})
-            else:
-                # OpenAI / others
-                messages_for_llm = [{"role": m["role"], "content": m["content"]} for m in chat_history]
+            # 6. Provider-specific message formatting (no if — use dict mapping)
+            message_formatters = {
+                "cohere": lambda history: [
+                    {"role": {"user": "USER", "assistant": "CHATBOT"}.get(m["role"], "SYSTEM"),
+                     "message": m["content"]}
+                    for m in history
+                ]
+            }
+            messages_for_llm = message_formatters.get(
+                provider,
+                lambda history: [{"role": m["role"], "content": m["content"]} for m in history]
+            )(chat_history)
 
-            # 7. Call LLM with full history
-            response_text = await llm_client.chat(
-                messages=messages_for_llm,
-                system=system_text,
-                documents=None
-            )
+            # 7. Call LLM
+            try:
+                response_text = await llm_client.chat(
+                    messages=messages_for_llm,
+                    system=system_text,
+                    documents=None
+                )
+            except Exception as e:
+                logger.exception("Error calling LLM provider")
+                raise LLMProviderError(provider, str(e))
 
             # 8. Append assistant message
             chat_history.append({"role": "assistant", "content": response_text})
 
             # 9. Save updated history
-            await self.mongo_repository.save_chat_history(user_id, provider, chat_history)
+            try:
+                await self.mongo_repository.save_chat_history(user_id, provider, chat_history)
+            except Exception as e:
+                logger.exception("Error saving chat history")
+                raise ChatHistorySaveError(str(e))
 
             return {"answer": response_text}
 
         except Exception as e:
             logger.exception("Failed to answer question")
-            return {"error": f"Failed to answer question: {str(e)}"}
+            return {"error": str(e)}
