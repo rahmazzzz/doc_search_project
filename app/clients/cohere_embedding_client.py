@@ -1,3 +1,4 @@
+# app/clients/cohere_embedding_client.py
 import cohere
 import logging
 from typing import List
@@ -30,7 +31,6 @@ class CohereEmbeddingClient:
         preview = texts[0][:100].replace("\n", " ")
         logger.debug(f"First chunk preview: {preview}...")
 
-
         try:
             response = self.client.embed(
                 texts=texts,
@@ -41,4 +41,26 @@ class CohereEmbeddingClient:
             return response.embeddings
         except Exception as e:
             logger.exception("Error during Cohere embedding request")
+            raise
+
+    def rerank(self, query: str, documents: List[str]):
+        """
+        Re-rank a list of documents using Cohere's rerank API.
+        """
+        if not documents:
+            logger.warning("rerank() called with an empty documents list")
+            return []
+
+        logger.info(f"Reranking {len(documents)} documents for query: {query[:100]}...")
+        try:
+            response = self.client.rerank(
+                model="rerank-english-v3.0",
+                query=query,
+                documents=documents,
+                top_n=len(documents)
+            )
+            logger.info(f"Rerank completed, {len(response.results)} results")
+            return response
+        except Exception as e:
+            logger.exception("Error during Cohere rerank request")
             raise
