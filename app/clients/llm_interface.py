@@ -5,9 +5,8 @@ class LLMChatInterface(ABC):
     @abstractmethod
     async def chat(
         self,
-        messages: List[Dict[str, str]],
+        user: str,
         system: Optional[str] = None,
-        documents: Optional[List[dict]] = None
     ) -> str:
         """
         Multi-turn chat with an LLM.

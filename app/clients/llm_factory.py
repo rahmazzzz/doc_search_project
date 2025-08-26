@@ -3,11 +3,14 @@ from app.core.config import settings
 from app.clients.llm_interface import LLMChatInterface
 from app.clients.cohere_chat_client import CohereChatClient
 from app.clients.openai_chat_client import OpenAIChatClient
+from app.clients.mistral_chat_client import MistralChatClient
+
 
 class LLMChatFactory:
     _PROVIDERS: dict[str, Type[LLMChatInterface]] = {
         "cohere": CohereChatClient,
         "openai": OpenAIChatClient,
+        "mistral": MistralChatClient,  # ✅ added Mistral
     }
 
     @classmethod
@@ -22,8 +25,10 @@ class LLMChatFactory:
         api_keys = {
             "cohere": settings.COHERE_API_KEY,
             "openai": settings.OPENAI_API_KEY,
+            "mistral": settings.MISTRAL_API_KEY
         }
         api_key = api_keys.get(provider_key)
+        print(f"Using API key for {api_key}")
         if not api_key:
             raise ValueError(f"API key for '{provider_name}' is missing.")
 
