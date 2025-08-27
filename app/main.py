@@ -26,7 +26,7 @@ app.add_middleware(
 app.include_router(auth_routes.router, prefix="/auth", tags=["Authentication"])
 app.include_router(file_routes.router, prefix="/upload", tags=["Upload"])
 app.include_router(search_routes.router, prefix="/search", tags=["Search"])
-app.include_router(question_routes.router, prefix="/questions", tags=["Questions"])
+app.include_router(question_routes.router, prefix="/chat", tags=["chat"])
 app.include_router(file_routes.router, prefix="/files", tags=["Files"])
 # Root endpoint
 @app.get("/")

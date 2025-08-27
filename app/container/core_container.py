@@ -4,17 +4,19 @@ from app.clients.cohere_embedding_client import CohereEmbeddingClient
 
 from app.repositories.mongo_repository import MongoRepository
 from app.repositories.qdrant_repository import QdrantRepository
+from app.repositories.prompt_repository import PromptRepository
 
 from app.services.file_processing import FileProcessingService
 from app.services.semantic_search import SemanticSearchService
 from app.services.llm_search import LLMSearchService
-from app.clients.cohere_chat_client import CohereChatClient
+
 from app.core.config import settings
-from app.repositories.prompt_repository import PromptRepository
+
+
 # === Clients ===
 mongo_client = MongoDBClient(
     uri=settings.MONGO_URI,
-    db_name=settings.MONGODB_DATABASE
+    db_name=settings.MONGODB_DATABASE,
 )
 
 qdrant_client = QdrantDBClient(
@@ -23,35 +25,44 @@ qdrant_client = QdrantDBClient(
     collection_name=settings.QDRANT_COLLECTION,
 )
 
+cohere_embedding_client = CohereEmbeddingClient(
+    api_key=settings.COHERE_API_KEY,
+)
 
-cohere_embedding_client = CohereEmbeddingClient(api_key=settings.COHERE_API_KEY)
-cohere_chat_client = CohereChatClient(api_key=settings.COHERE_API_KEY)
+
 # === Repositories ===
 mongo_repository = MongoRepository(mongo_client)
 qdrant_repository = QdrantRepository(qdrant_client)
 prompt_repository = PromptRepository(mongo_client.db)
+
+
 # === Services ===
 semantic_search_service = SemanticSearchService(
     cohere_client=cohere_embedding_client,
-    qdrant_repository=qdrant_repository
+    qdrant_repository=qdrant_repository,
 )
 
 file_processing_service = FileProcessingService(
     mongo_repository=mongo_repository,
-    semantic_search_service=semantic_search_service
+    semantic_search_service=semantic_search_service,
 )
 
 llm_search_service = LLMSearchService(
     semantic_search_service=semantic_search_service,
     cohere_embedding_client=cohere_embedding_client,
-    cohere_chat_client=cohere_chat_client,
     qdrant_repository=qdrant_repository,
     mongo_repository=mongo_repository,
-    prompt_repository=prompt_repository 
+    prompt_repository=prompt_repository,
 )
+
 
 # === Container Class ===
 class Container:
+    """
+    Dependency container that exposes initialized
+    clients, repositories, and services.
+    """
+
     def __init__(self):
         # Clients
         self.mongo_client = mongo_client
@@ -68,7 +79,9 @@ class Container:
         self.file_processing_service = file_processing_service
         self.llm_search_service = llm_search_service
 
-        # Alias for route usage
+        # Alias (if both names used in project)
         self.file_search_service = file_processing_service
 
+
+# Global singleton
 container = Container()
