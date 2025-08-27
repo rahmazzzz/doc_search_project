@@ -1,6 +1,7 @@
-from app.clients.nosqldb_client import MongoDBClient
+from app.clients.nosqldb_client import MongoDBClient 
 from app.clients.vectordb_client import QdrantDBClient
 from app.clients.cohere_embedding_client import CohereEmbeddingClient
+from app.clients.mistral_chat_client import MistralChatClient
 
 from app.repositories.mongo_repository import MongoRepository
 from app.repositories.qdrant_repository import QdrantRepository
@@ -9,6 +10,8 @@ from app.repositories.prompt_repository import PromptRepository
 from app.services.file_processing import FileProcessingService
 from app.services.semantic_search import SemanticSearchService
 from app.services.llm_search import LLMSearchService
+from app.services.orchestrator import OrchestratorAgent
+from app.services.tavily_service import TavilyService   # ✅ only service we need
 
 from app.core.config import settings
 
@@ -27,6 +30,10 @@ qdrant_client = QdrantDBClient(
 
 cohere_embedding_client = CohereEmbeddingClient(
     api_key=settings.COHERE_API_KEY,
+)
+
+mistral_chat_client = MistralChatClient(
+    api_key=settings.MISTRAL_API_KEY
 )
 
 
@@ -55,6 +62,16 @@ llm_search_service = LLMSearchService(
     prompt_repository=prompt_repository,
 )
 
+tavily_service = TavilyService(api_key=settings.TAVILY_API_KEY)   # ✅ inject config key
+
+
+# === Orchestrator Service ===
+orchestrator_service = OrchestratorAgent(
+    doc_service=semantic_search_service,
+    web_service=tavily_service,   # ✅ direct service
+    llm_client=mistral_chat_client
+)
+
 
 # === Container Class ===
 class Container:
@@ -68,6 +85,7 @@ class Container:
         self.mongo_client = mongo_client
         self.qdrant_client = qdrant_client
         self.cohere_client = cohere_embedding_client
+        self.mistral_client = mistral_chat_client
 
         # Repositories
         self.mongo_repository = mongo_repository
@@ -78,8 +96,10 @@ class Container:
         self.semantic_search_service = semantic_search_service
         self.file_processing_service = file_processing_service
         self.llm_search_service = llm_search_service
+        self.tavily_service = tavily_service   # ✅
+        self.orchestrator_service = orchestrator_service
 
-        # Alias (if both names used in project)
+        # Alias
         self.file_search_service = file_processing_service
 
 

@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     COHERE_API_KEY: str
     OPENAI_API_KEY: str
     MISTRAL_API_KEY: str
+    
+    
+    TAVILY_API_KEY: str
     class Config:
         env_file = ".env"
 

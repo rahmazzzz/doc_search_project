@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 from app.routes import question_routes
+from app.routes import orchestrator_routes
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -28,6 +29,7 @@ app.include_router(file_routes.router, prefix="/upload", tags=["Upload"])
 app.include_router(search_routes.router, prefix="/search", tags=["Search"])
 app.include_router(question_routes.router, prefix="/chat", tags=["chat"])
 app.include_router(file_routes.router, prefix="/files", tags=["Files"])
+app.include_router(orchestrator_routes.router)
 # Root endpoint
 @app.get("/")
 def read_root():

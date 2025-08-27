@@ -16,4 +16,4 @@ pyPDF2
 aiofiles
 openai
 mistralai
-
+tavily-python
